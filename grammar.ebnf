@@ -1,0 +1,203 @@
+(* =============================================================================
+   Formal EBNF Grammar Specification for the B-Minor Programming Language
+   Course: Principles of Compiler Design (Fall 2026 / 1405)
+   Target Architecture: Compiler Front-End / LL(1)-compatible Recursive Descent
+   Notation: ISO/IEC 14977 variant (EBNF)
+             - Terminal symbols are enclosed in single or double quotes (e.g., ':', ';').
+             - Named tokens from the lexical analyzer are in ALL_CAPS (e.g., IDENT, INT_LITERAL).
+             - Non-terminals are in snake_case (e.g., type_specifier, expr).
+             - Brackets [ ... ] denote optional components (0 or 1 occurrence).
+             - Braces { ... } denote repetition (0 or more occurrences).
+             - Parentheses ( ... ) denote grouping.
+             - Alternation is denoted by '|'.
+             - Left-recursion has been systematically eliminated via iteration and
+               stratified precedence levels.
+   ============================================================================= *)
+
+(* -----------------------------------------------------------------------------
+   1. Program & Top-Level Declarations
+   A B-Minor program consists of an optional sequence of global declarations
+   ending at End-Of-File (EOF).
+   ----------------------------------------------------------------------------- *)
+
+program
+    ::= { declaration } EOF ;
+
+declaration
+    ::= IDENT ':' type_specifier [ '=' initializer ] ';'
+      | function_definition ;
+
+function_definition
+    ::= IDENT ':' 'function' return_type '(' [ parameter_list ] ')' '=' compound_stmt ;
+
+parameter_list
+    ::= parameter { ',' parameter } ;
+
+parameter
+    ::= IDENT ':' type_specifier ;
+
+initializer
+    ::= expr
+      | array_initializer ;
+
+array_initializer
+    ::= '{' initializer { ',' initializer } '}' ;
+
+(* -----------------------------------------------------------------------------
+   2. Type System
+   B-Minor supports primitive types, fixed-length / open array types, and
+   function signatures (including prototypes).
+   ----------------------------------------------------------------------------- *)
+
+type_specifier
+    ::= primitive_type
+      | array_type
+      | function_type ;
+
+primitive_type
+    ::= 'integer'
+      | 'boolean'
+      | 'char'
+      | 'string'
+      | 'void'
+      | 'auto' ;
+
+return_type
+    ::= primitive_type
+      | array_type ;
+
+array_type
+    ::= 'array' '[' [ expr ] ']' type_specifier ;
+
+function_type
+    ::= 'function' return_type '(' [ parameter_list ] ')' ;
+
+(* -----------------------------------------------------------------------------
+   3. Statements & Blocks
+   Statements include blocks, variable declarations, expressions, control flow
+   (if-else, while, for), I/O (print), and function return.
+   ----------------------------------------------------------------------------- *)
+
+statement
+    ::= declaration
+      | compound_stmt
+      | expr_stmt
+      | if_stmt
+      | while_stmt
+      | for_stmt
+      | return_stmt
+      | print_stmt ;
+
+compound_stmt
+    ::= '{' { statement } '}' ;
+
+expr_stmt
+    ::= [ expr ] ';' ;
+
+(* Dangling-else ambiguity resolution: In recursive descent parsers, an optional
+   'else' clause is bound greedily to the innermost open 'if'. *)
+if_stmt
+    ::= 'if' '(' expr ')' statement [ 'else' statement ] ;
+
+while_stmt
+    ::= 'while' '(' expr ')' statement ;
+
+for_stmt
+    ::= 'for' '(' [ expr ] ';' [ expr ] ';' [ expr ] ')' statement ;
+
+return_stmt
+    ::= 'return' [ expr ] ';' ;
+
+print_stmt
+    ::= 'print' [ expr_list ] ';' ;
+
+expr_list
+    ::= expr { ',' expr } ;
+
+(* -----------------------------------------------------------------------------
+   4. Expressions & Operator Precedence Hierarchy
+   Stratified from lowest precedence (assignment) to highest (primary).
+   Left-recursive productions A -> A op B are transformed into A -> B { op B }.
+   Right-associative productions A -> B op A are maintained via right-recursive tails.
+   ----------------------------------------------------------------------------- *)
+
+expr
+    ::= assignment_expr ;
+
+(* Precedence 1: Assignment operator '=' (Right-associative)
+   A l-value can be an identifier or an indexed array expression. *)
+assignment_expr
+    ::= logical_or_expr [ '=' assignment_expr ] ;
+
+(* Precedence 2: Logical OR '||' (Left-associative) *)
+logical_or_expr
+    ::= logical_and_expr { '||' logical_and_expr } ;
+
+(* Precedence 3: Logical AND '&&' (Left-associative) *)
+logical_and_expr
+    ::= equality_expr { '&&' equality_expr } ;
+
+(* Precedence 4: Equality operators '==' | '!=' (Left-associative) *)
+equality_expr
+    ::= relational_expr { equality_op relational_expr } ;
+
+equality_op
+    ::= '==' | '!=' ;
+
+(* Precedence 5: Relational operators '<' | '<=' | '>' | '>=' (Left-associative) *)
+relational_expr
+    ::= additive_expr { relational_op additive_expr } ;
+
+relational_op
+    ::= '<' | '<=' | '>' | '>=' ;
+
+(* Precedence 6: Additive operators '+' | '-' (Left-associative) *)
+additive_expr
+    ::= multiplicative_expr { additive_op multiplicative_expr } ;
+
+additive_op
+    ::= '+' | '-' ;
+
+(* Precedence 7: Multiplicative operators '*' | '/' | '%' (Left-associative) *)
+multiplicative_expr
+    ::= exponentiation_expr { multiplicative_op exponentiation_expr } ;
+
+multiplicative_op
+    ::= '*' | '/' | '%' ;
+
+(* Precedence 8: Exponentiation operator '^' (Right-associative) *)
+exponentiation_expr
+    ::= unary_expr [ '^' exponentiation_expr ] ;
+
+(* Precedence 9: Prefix Unary operators '-' (negation) | '!' (logical NOT) *)
+unary_expr
+    ::= '-' unary_expr
+      | '!' unary_expr
+      | postfix_expr ;
+
+(* Precedence 10: Postfix operators (Array indexing, Function call, Post-inc/dec)
+   Left-associative chain over a primary operand. *)
+postfix_expr
+    ::= primary_expr { postfix_op } ;
+
+postfix_op
+    ::= '[' expr ']'
+      | '(' [ argument_list ] ')'
+      | '++'
+      | '--' ;
+
+argument_list
+    ::= expr { ',' expr } ;
+
+(* Precedence 11: Primary expressions (Leaves of AST) *)
+primary_expr
+    ::= IDENT
+      | INT_LITERAL
+      | CHAR_LITERAL
+      | STRING_LITERAL
+      | BOOL_LITERAL
+      | '(' expr ')' ;
+
+BOOL_LITERAL
+    ::= 'true'
+      | 'false' ;
