@@ -96,6 +96,8 @@ struct Token {
     TokenType type{TokenType::INVALID};
     std::string lexeme;
     SourceLocation location;
+    size_t startOffset{0};
+    size_t endOffset{0};
 
     std::string toString() const;
 };

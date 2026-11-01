@@ -110,6 +110,7 @@ void Lexer::skipWhitespace() {
 Token Lexer::scanSingleLineComment() {
     int startLine = m_line;
     int startCol = m_column;
+    size_t startPos = m_cursor;
     std::string lexeme;
     lexeme += advance(); // '/'
     lexeme += advance(); // '/'
@@ -118,12 +119,13 @@ Token Lexer::scanSingleLineComment() {
         lexeme += advance();
     }
 
-    return Token{TokenType::COMMENT_SINGLE, lexeme, SourceLocation{m_filename, startLine, startCol}};
+    return Token{TokenType::COMMENT_SINGLE, lexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
 }
 
 Token Lexer::scanBlockComment() {
     int startLine = m_line;
     int startCol = m_column;
+    size_t startPos = m_cursor;
     std::string lexeme;
     lexeme += advance(); // '/'
     lexeme += advance(); // '*'
@@ -154,10 +156,10 @@ Token Lexer::scanBlockComment() {
 
     if (!closed) {
         reportError(startLine, startCol, "Unterminated block comment");
-        return Token{TokenType::INVALID, lexeme, SourceLocation{m_filename, startLine, startCol}};
+        return Token{TokenType::INVALID, lexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
     }
 
-    return Token{TokenType::COMMENT_BLOCK, lexeme, SourceLocation{m_filename, startLine, startCol}};
+    return Token{TokenType::COMMENT_BLOCK, lexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
 }
 
 Token Lexer::scanIdentifierOrKeyword() {
@@ -180,10 +182,10 @@ Token Lexer::scanIdentifierOrKeyword() {
     // Keyword lookup (Keyword-over-identifier precedence)
     auto it = s_keywords.find(lexeme);
     if (it != s_keywords.end()) {
-        return Token{it->second, lexeme, loc};
+        return Token{it->second, lexeme, loc, startPos, m_cursor};
     }
 
-    return Token{TokenType::IDENTIFIER, lexeme, loc};
+    return Token{TokenType::IDENTIFIER, lexeme, loc, startPos, m_cursor};
 }
 
 Token Lexer::scanNumber() {
@@ -196,7 +198,7 @@ Token Lexer::scanNumber() {
     }
 
     std::string lexeme = m_source.substr(startPos, m_cursor - startPos);
-    return Token{TokenType::INTEGER_LITERAL, lexeme, SourceLocation{m_filename, startLine, startCol}};
+    return Token{TokenType::INTEGER_LITERAL, lexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
 }
 
 bool Lexer::processEscapeSequence(std::string& rawLexeme, std::string& evaluatedValue) {
@@ -227,6 +229,7 @@ bool Lexer::processEscapeSequence(std::string& rawLexeme, std::string& evaluated
 Token Lexer::scanStringLiteral() {
     int startLine = m_line;
     int startCol = m_column;
+    size_t startPos = m_cursor;
 
     advance(); // Consume opening quote '"'
     std::string rawLexeme = "\"";
@@ -243,7 +246,7 @@ Token Lexer::scanStringLiteral() {
         if (c == '\n' || c == '\r') {
             // Unescaped newline in string literal is illegal in B-Minor
             reportError(startLine, startCol, "Unterminated string literal (unescaped newline)");
-            return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+            return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
         }
         if (c == '\\') {
             rawLexeme += advance(); // consume '\\'
@@ -258,15 +261,16 @@ Token Lexer::scanStringLiteral() {
 
     if (!closed) {
         reportError(startLine, startCol, "Unterminated string literal at end of file");
-        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
     }
 
-    return Token{TokenType::STRING_LITERAL, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+    return Token{TokenType::STRING_LITERAL, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
 }
 
 Token Lexer::scanCharacterLiteral() {
     int startLine = m_line;
     int startCol = m_column;
+    size_t startPos = m_cursor;
 
     advance(); // Consume opening quote '\''
     std::string rawLexeme = "\'";
@@ -274,14 +278,14 @@ Token Lexer::scanCharacterLiteral() {
 
     if (isAtEnd() || peek() == '\n' || peek() == '\r') {
         reportError(startLine, startCol, "Unterminated character literal");
-        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
     }
 
     if (peek() == '\'') {
         // Empty character constant ''
         rawLexeme += advance();
         reportError(startLine, startCol, "Empty character literal");
-        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
     }
 
     if (peek() == '\\') {
@@ -297,11 +301,11 @@ Token Lexer::scanCharacterLiteral() {
 
     if (isAtEnd() || peek() != '\'') {
         reportError(startLine, startCol, "Unterminated character literal, expected closing quote");
-        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+        return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
     }
 
     rawLexeme += advance(); // Consume closing '\''
-    return Token{TokenType::CHARACTER_LITERAL, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
+    return Token{TokenType::CHARACTER_LITERAL, rawLexeme, SourceLocation{m_filename, startLine, startCol}, startPos, m_cursor};
 }
 
 Token Lexer::nextToken() {
@@ -309,7 +313,7 @@ Token Lexer::nextToken() {
         skipWhitespace();
 
         if (isAtEnd()) {
-            return Token{TokenType::EOF_TOKEN, "", SourceLocation{m_filename, m_line, m_column}};
+            return Token{TokenType::EOF_TOKEN, "", SourceLocation{m_filename, m_line, m_column}, m_cursor, m_cursor};
         }
 
         // Check for comments
@@ -339,6 +343,7 @@ Token Lexer::nextToken() {
 
     int startLine = m_line;
     int startCol = m_column;
+    size_t startPos = m_cursor;
     char c = peek();
 
     // 1. Identifiers and Keywords
@@ -367,61 +372,61 @@ Token Lexer::nextToken() {
 
     switch (c) {
         // Delimiters
-        case '(': return Token{TokenType::LPAREN, "(", loc};
-        case ')': return Token{TokenType::RPAREN, ")", loc};
-        case '[': return Token{TokenType::LBRACKET, "[", loc};
-        case ']': return Token{TokenType::RBRACKET, "]", loc};
-        case '{': return Token{TokenType::LBRACE, "{", loc};
-        case '}': return Token{TokenType::RBRACE, "}", loc};
-        case ';': return Token{TokenType::SEMICOLON, ";", loc};
-        case ':': return Token{TokenType::COLON, ":", loc};
-        case ',': return Token{TokenType::COMMA, ",", loc};
+        case '(': return Token{TokenType::LPAREN, "(", loc, startPos, m_cursor};
+        case ')': return Token{TokenType::RPAREN, ")", loc, startPos, m_cursor};
+        case '[': return Token{TokenType::LBRACKET, "[", loc, startPos, m_cursor};
+        case ']': return Token{TokenType::RBRACKET, "]", loc, startPos, m_cursor};
+        case '{': return Token{TokenType::LBRACE, "{", loc, startPos, m_cursor};
+        case '}': return Token{TokenType::RBRACE, "}", loc, startPos, m_cursor};
+        case ';': return Token{TokenType::SEMICOLON, ";", loc, startPos, m_cursor};
+        case ':': return Token{TokenType::COLON, ":", loc, startPos, m_cursor};
+        case ',': return Token{TokenType::COMMA, ",", loc, startPos, m_cursor};
 
         // Arithmetic Operators
         case '+':
-            if (match('+')) return Token{TokenType::OP_INC, "++", loc};
-            return Token{TokenType::OP_PLUS, "+", loc};
+            if (match('+')) return Token{TokenType::OP_INC, "++", loc, startPos, m_cursor};
+            return Token{TokenType::OP_PLUS, "+", loc, startPos, m_cursor};
         case '-':
-            if (match('-')) return Token{TokenType::OP_DEC, "--", loc};
-            return Token{TokenType::OP_MINUS, "-", loc};
+            if (match('-')) return Token{TokenType::OP_DEC, "--", loc, startPos, m_cursor};
+            return Token{TokenType::OP_MINUS, "-", loc, startPos, m_cursor};
         case '*':
-            return Token{TokenType::OP_MUL, "*", loc};
+            return Token{TokenType::OP_MUL, "*", loc, startPos, m_cursor};
         case '/':
             // Single '/' division operator
-            return Token{TokenType::OP_DIV, "/", loc};
+            return Token{TokenType::OP_DIV, "/", loc, startPos, m_cursor};
         case '%':
-            return Token{TokenType::OP_MOD, "%", loc};
+            return Token{TokenType::OP_MOD, "%", loc, startPos, m_cursor};
         case '^':
-            return Token{TokenType::OP_EXP, "^", loc};
+            return Token{TokenType::OP_EXP, "^", loc, startPos, m_cursor};
 
         // Relational and Assignment Operators
         case '=':
-            if (match('=')) return Token{TokenType::OP_EQ, "==", loc};
-            return Token{TokenType::OP_ASSIGN, "=", loc};
+            if (match('=')) return Token{TokenType::OP_EQ, "==", loc, startPos, m_cursor};
+            return Token{TokenType::OP_ASSIGN, "=", loc, startPos, m_cursor};
         case '<':
-            if (match('=')) return Token{TokenType::OP_LEQ, "<=", loc};
-            return Token{TokenType::OP_LT, "<", loc};
+            if (match('=')) return Token{TokenType::OP_LEQ, "<=", loc, startPos, m_cursor};
+            return Token{TokenType::OP_LT, "<", loc, startPos, m_cursor};
         case '>':
-            if (match('=')) return Token{TokenType::OP_GEQ, ">=", loc};
-            return Token{TokenType::OP_GT, ">", loc};
+            if (match('=')) return Token{TokenType::OP_GEQ, ">=", loc, startPos, m_cursor};
+            return Token{TokenType::OP_GT, ">", loc, startPos, m_cursor};
         case '!':
-            if (match('=')) return Token{TokenType::OP_NEQ, "!=", loc};
-            return Token{TokenType::OP_LNOT, "!", loc};
+            if (match('=')) return Token{TokenType::OP_NEQ, "!=", loc, startPos, m_cursor};
+            return Token{TokenType::OP_LNOT, "!", loc, startPos, m_cursor};
 
         // Logical Operators
         case '&':
-            if (match('&')) return Token{TokenType::OP_LAND, "&&", loc};
+            if (match('&')) return Token{TokenType::OP_LAND, "&&", loc, startPos, m_cursor};
             reportError(startLine, startCol, "Unexpected character '&', did you mean '&&'?");
-            return Token{TokenType::INVALID, "&", loc};
+            return Token{TokenType::INVALID, "&", loc, startPos, m_cursor};
         case '|':
-            if (match('|')) return Token{TokenType::OP_LOR, "||", loc};
+            if (match('|')) return Token{TokenType::OP_LOR, "||", loc, startPos, m_cursor};
             reportError(startLine, startCol, "Unexpected character '|', did you mean '||'?");
-            return Token{TokenType::INVALID, "|", loc};
+            return Token{TokenType::INVALID, "|", loc, startPos, m_cursor};
 
         default:
             // Unrecognized character
             reportError(startLine, startCol, std::string("Unrecognized character '") + c + "'");
-            return Token{TokenType::INVALID, std::string(1, c), loc};
+            return Token{TokenType::INVALID, std::string(1, c), loc, startPos, m_cursor};
     }
 }
 
