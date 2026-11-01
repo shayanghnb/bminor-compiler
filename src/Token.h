@@ -70,6 +70,10 @@ enum class TokenType {
     SEMICOLON,      // ;
     COMMA,          // ,
 
+    // Comments (Preserved for Syntax Highlighting)
+    COMMENT_SINGLE, // // single-line comment
+    COMMENT_BLOCK,  // /* multi-line comment */
+
     // Special Tokens
     EOF_TOKEN,      // End of Input
     INVALID         // Lexical Error
@@ -152,6 +156,9 @@ inline std::string_view tokenTypeToString(TokenType type) {
         case TokenType::COLON:            return "COLON";
         case TokenType::SEMICOLON:        return "SEMICOLON";
         case TokenType::COMMA:            return "COMMA";
+
+        case TokenType::COMMENT_SINGLE:   return "COMMENT_SINGLE";
+        case TokenType::COMMENT_BLOCK:    return "COMMENT_BLOCK";
 
         case TokenType::EOF_TOKEN:        return "EOF_TOKEN";
         case TokenType::INVALID:          return "INVALID";

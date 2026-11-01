@@ -9,7 +9,7 @@ void printTokenHeader() {
               << std::setw(12) << "Location"
               << std::setw(22) << "Token Type"
               << "Lexeme" << "\n";
-    std::cout << std::string(55, '-') << "\n";
+    std::cout << std::string(60, '-') << "\n";
 }
 
 void printTokenRow(const bminor::Token& tok) {
@@ -20,16 +20,17 @@ void printTokenRow(const bminor::Token& tok) {
               << "\"" << tok.lexeme << "\"\n";
 }
 
-void runLexerTest(const std::string& testName, const std::string& source) {
+void runLexerTest(const std::string& testName, const std::string& source, bool preserveComments = false) {
     std::cout << "\n======================================================\n";
     std::cout << " TEST CASE: " << testName << "\n";
+    std::cout << " (preserveComments = " << (preserveComments ? "true [Highlighter Mode]" : "false [Parser Mode]") << ")\n";
     std::cout << "======================================================\n";
     std::cout << "--- Source Code ---\n" << source << "\n";
     std::cout << "--- Token Stream ---\n";
 
     printTokenHeader();
 
-    bminor::Lexer lexer(source, testName);
+    bminor::Lexer lexer(source, testName, preserveComments);
     std::vector<bminor::Token> tokens = lexer.tokenizeAll();
 
     for (const auto& tok : tokens) {
@@ -53,9 +54,10 @@ int main(int argc, char* argv[]) {
     // If an external file is provided via CLI
     if (argc > 1) {
         std::string filepath = argv[1];
+        bool preserve = (argc > 2 && std::string(argv[2]) == "--preserve-comments");
         try {
-            bminor::Lexer fileLexer = bminor::Lexer::fromFile(filepath);
-            std::cout << "\nTokenizing file: " << filepath << "\n";
+            bminor::Lexer fileLexer = bminor::Lexer::fromFile(filepath, preserve);
+            std::cout << "\nTokenizing file: " << filepath << " (preserveComments=" << preserve << ")\n";
             printTokenHeader();
             auto tokens = fileLexer.tokenizeAll();
             for (const auto& tok : tokens) {
@@ -74,8 +76,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    // Test Case 1: Valid B-Minor program (Factorial and Array declaration)
-    std::string validBMinorProgram = 
+    // Common B-Minor test snippet with comments
+    std::string sampleProgram = 
         "// Recursive factorial calculation in B-Minor\n"
         "factorial: function integer ( n: integer ) = {\n"
         "    if (n <= 1) return 1;\n"
@@ -88,27 +90,31 @@ int main(int argc, char* argv[]) {
         "letter: char = 'A';\n"
         "isValid: boolean = true;\n";
 
-    runLexerTest("Valid B-Minor Syntax & Constructs", validBMinorProgram);
+    // Test Case 1: Parser Mode (Default: preserveComments = false)
+    runLexerTest("Parser Mode (Comments Skipped)", sampleProgram, false);
 
-    // Test Case 2: Maximal Munch & Operator Disambiguation
+    // Test Case 2: Syntax Highlighter Mode (preserveComments = true)
+    runLexerTest("Syntax Highlighter Mode (Comments Preserved)", sampleProgram, true);
+
+    // Test Case 3: Maximal Munch & Operator Disambiguation
     std::string operatorTest =
         "x++ + y-- - z;\n"
         "a <= b && c >= d || e == f != g;\n"
         "2^3 * 4 / 5 % 6;\n"
         "arr[i] = !flag;\n";
 
-    runLexerTest("Maximal Munch & Compound Operators", operatorTest);
+    runLexerTest("Maximal Munch & Compound Operators", operatorTest, false);
 
-    // Test Case 3: Escape sequences in strings and characters
+    // Test Case 4: Escape sequences in strings and characters
     std::string escapeTest =
         "str1: string = \"Tab:\\t Newline:\\n Backslash:\\\\ Quote:\\\"\";\n"
         "ch1: char = '\\n';\n"
         "ch2: char = '\\'';\n"
         "ch3: char = '\\\\';\n";
 
-    runLexerTest("Escape Sequences", escapeTest);
+    runLexerTest("Escape Sequences", escapeTest, false);
 
-    // Test Case 4: Intentional Lexical Errors & Panic Recovery
+    // Test Case 5: Intentional Lexical Errors & Panic Recovery
     std::string errorRecoveryTest =
         "valid_var: integer = 42;\n"
         "bad_chars: @ $ # ~;\n"
@@ -117,10 +123,10 @@ int main(int argc, char* argv[]) {
         "after_bad_str: integer = 200;\n"
         "bad_comment: /* unterminated block comment at end of input";
 
-    runLexerTest("Error Detection and Resilient Recovery", errorRecoveryTest);
+    runLexerTest("Error Detection and Resilient Recovery", errorRecoveryTest, false);
 
     std::cout << "\n======================================================\n";
-    std::cout << "All automated lexer test scenarios executed.\n";
+    std::cout << "All automated lexer test scenarios executed successfully.\n";
     std::cout << "======================================================\n";
 
     return 0;

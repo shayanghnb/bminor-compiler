@@ -10,10 +10,14 @@ namespace bminor {
 
 class Lexer {
 public:
-    explicit Lexer(std::string source, std::string filename = "<input>");
+    explicit Lexer(std::string source, std::string filename = "<input>", bool preserveComments = false);
 
     // Factory method to initialize a Lexer directly from a file path
-    static Lexer fromFile(const std::string& filepath);
+    static Lexer fromFile(const std::string& filepath, bool preserveComments = false);
+
+    // Comment preservation control (for Syntax Highlighting vs Parser)
+    void setPreserveComments(bool preserve) { m_preserveComments = preserve; }
+    bool preservesComments() const { return m_preserveComments; }
 
     // Scans and returns the next token from the input stream
     Token nextToken();
@@ -34,6 +38,7 @@ private:
     size_t m_cursor{0};
     int m_line{1};
     int m_column{1};
+    bool m_preserveComments{false};
 
     std::vector<std::string> m_errors;
     static const std::unordered_map<std::string, TokenType> s_keywords;
@@ -46,8 +51,9 @@ private:
     bool match(char expected);
 
     // Whitespace and comment processing
-    // Returns false if an unterminated block comment error was encountered
-    bool skipWhitespaceAndComments(Token* outErrorToken);
+    void skipWhitespace();
+    Token scanSingleLineComment();
+    Token scanBlockComment();
 
     // Sub-scanners for specific token categories
     Token scanIdentifierOrKeyword();

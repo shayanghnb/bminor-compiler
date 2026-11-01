@@ -25,21 +25,22 @@ const std::unordered_map<std::string, TokenType> Lexer::s_keywords = {
     {"while",    TokenType::KEYWORD_WHILE}
 };
 
-Lexer::Lexer(std::string source, std::string filename)
+Lexer::Lexer(std::string source, std::string filename, bool preserveComments)
     : m_source(std::move(source)),
       m_filename(std::move(filename)),
       m_cursor(0),
       m_line(1),
-      m_column(1) {}
+      m_column(1),
+      m_preserveComments(preserveComments) {}
 
-Lexer Lexer::fromFile(const std::string& filepath) {
+Lexer Lexer::fromFile(const std::string& filepath, bool preserveComments) {
     std::ifstream file(filepath, std::ios::in | std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("Lexer: Unable to open source file: " + filepath);
     }
     std::ostringstream ss;
     ss << file.rdbuf();
-    return Lexer(ss.str(), filepath);
+    return Lexer(ss.str(), filepath, preserveComments);
 }
 
 void Lexer::reset() {
@@ -84,11 +85,9 @@ void Lexer::reportError(int line, int col, const std::string& message) {
     m_errors.push_back(err);
 }
 
-bool Lexer::skipWhitespaceAndComments(Token* outErrorToken) {
+void Lexer::skipWhitespace() {
     while (!isAtEnd()) {
         char c = peek();
-
-        // 1. Whitespace handling
         if (c == ' ' || c == '\t' || c == '\v' || c == '\f') {
             advance();
         } else if (c == '\r') {
@@ -102,67 +101,63 @@ bool Lexer::skipWhitespaceAndComments(Token* outErrorToken) {
             advance();
             m_line++;
             m_column = 1;
-        }
-        // 2. Comments
-        else if (c == '/') {
-            char next = peekAhead(1);
-            if (next == '/') {
-                // Single-line comment: skip until newline or EOF
-                advance(); // '/'
-                advance(); // '/'
-                while (!isAtEnd() && peek() != '\n' && peek() != '\r') {
-                    advance();
-                }
-            } else if (next == '*') {
-                // Multi-line block comment: /* ... */
-                int startLine = m_line;
-                int startCol = m_column;
-                advance(); // '/'
-                advance(); // '*'
-                bool closed = false;
-
-                while (!isAtEnd()) {
-                    if (peek() == '*' && peekAhead(1) == '/') {
-                        advance(); // '*'
-                        advance(); // '/'
-                        closed = true;
-                        break;
-                    }
-                    if (peek() == '\r') {
-                        advance();
-                        if (peek() == '\n') advance();
-                        m_line++;
-                        m_column = 1;
-                    } else if (peek() == '\n') {
-                        advance();
-                        m_line++;
-                        m_column = 1;
-                    } else {
-                        advance();
-                    }
-                }
-
-                if (!closed) {
-                    reportError(startLine, startCol, "Unterminated block comment");
-                    if (outErrorToken) {
-                        *outErrorToken = Token{
-                            TokenType::INVALID,
-                            "/*",
-                            SourceLocation{m_filename, startLine, startCol}
-                        };
-                    }
-                    return false;
-                }
-            } else {
-                // Lone '/', this is the division operator
-                break;
-            }
         } else {
-            // Not whitespace or comment
             break;
         }
     }
-    return true;
+}
+
+Token Lexer::scanSingleLineComment() {
+    int startLine = m_line;
+    int startCol = m_column;
+    std::string lexeme;
+    lexeme += advance(); // '/'
+    lexeme += advance(); // '/'
+
+    while (!isAtEnd() && peek() != '\n' && peek() != '\r') {
+        lexeme += advance();
+    }
+
+    return Token{TokenType::COMMENT_SINGLE, lexeme, SourceLocation{m_filename, startLine, startCol}};
+}
+
+Token Lexer::scanBlockComment() {
+    int startLine = m_line;
+    int startCol = m_column;
+    std::string lexeme;
+    lexeme += advance(); // '/'
+    lexeme += advance(); // '*'
+    bool closed = false;
+
+    while (!isAtEnd()) {
+        if (peek() == '*' && peekAhead(1) == '/') {
+            lexeme += advance(); // '*'
+            lexeme += advance(); // '/'
+            closed = true;
+            break;
+        }
+        if (peek() == '\r') {
+            lexeme += advance();
+            if (peek() == '\n') {
+                lexeme += advance();
+            }
+            m_line++;
+            m_column = 1;
+        } else if (peek() == '\n') {
+            lexeme += advance();
+            m_line++;
+            m_column = 1;
+        } else {
+            lexeme += advance();
+        }
+    }
+
+    if (!closed) {
+        reportError(startLine, startCol, "Unterminated block comment");
+        return Token{TokenType::INVALID, lexeme, SourceLocation{m_filename, startLine, startCol}};
+    }
+
+    return Token{TokenType::COMMENT_BLOCK, lexeme, SourceLocation{m_filename, startLine, startCol}};
 }
 
 Token Lexer::scanIdentifierOrKeyword() {
@@ -302,7 +297,6 @@ Token Lexer::scanCharacterLiteral() {
 
     if (isAtEnd() || peek() != '\'') {
         reportError(startLine, startCol, "Unterminated character literal, expected closing quote");
-        // Recover up to next space or newline
         return Token{TokenType::INVALID, rawLexeme, SourceLocation{m_filename, startLine, startCol}};
     }
 
@@ -311,13 +305,36 @@ Token Lexer::scanCharacterLiteral() {
 }
 
 Token Lexer::nextToken() {
-    Token errorToken;
-    if (!skipWhitespaceAndComments(&errorToken)) {
-        return errorToken;
-    }
+    while (true) {
+        skipWhitespace();
 
-    if (isAtEnd()) {
-        return Token{TokenType::EOF_TOKEN, "", SourceLocation{m_filename, m_line, m_column}};
+        if (isAtEnd()) {
+            return Token{TokenType::EOF_TOKEN, "", SourceLocation{m_filename, m_line, m_column}};
+        }
+
+        // Check for comments
+        if (peek() == '/') {
+            if (peekAhead(1) == '/') {
+                Token commentTok = scanSingleLineComment();
+                if (m_preserveComments) {
+                    return commentTok;
+                }
+                continue; // Skip comment and look for next token
+            }
+            if (peekAhead(1) == '*') {
+                Token commentTok = scanBlockComment();
+                if (commentTok.type == TokenType::INVALID) {
+                    return commentTok; // Propagate error
+                }
+                if (m_preserveComments) {
+                    return commentTok;
+                }
+                continue; // Skip comment and look for next token
+            }
+        }
+
+        // Not whitespace or a skipped comment
+        break;
     }
 
     int startLine = m_line;
@@ -370,7 +387,7 @@ Token Lexer::nextToken() {
         case '*':
             return Token{TokenType::OP_MUL, "*", loc};
         case '/':
-            // Single '/' because comments were stripped in skipWhitespaceAndComments
+            // Single '/' division operator
             return Token{TokenType::OP_DIV, "/", loc};
         case '%':
             return Token{TokenType::OP_MOD, "%", loc};
