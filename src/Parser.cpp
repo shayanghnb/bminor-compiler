@@ -610,7 +610,13 @@ std::unique_ptr<ExprNode> Parser::parsePostfix() {
 // Precedence 11: Primary
 std::unique_ptr<ExprNode> Parser::parsePrimary() {
     if (match(TokenType::INTEGER_LITERAL)) {
-        int64_t val = std::stoll(previous().lexeme);
+        int64_t val = 0;
+        try {
+            val = std::stoll(previous().lexeme);
+        } catch (const std::exception&) {
+            recordError(previous(), "Integer literal '" + previous().lexeme + "' exceeds 64-bit integer range");
+            val = 0;
+        }
         return std::make_unique<IntLiteralNode>(val, previous().location);
     }
     if (match(TokenType::BOOLEAN_LITERAL)) {

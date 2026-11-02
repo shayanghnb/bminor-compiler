@@ -28,7 +28,8 @@ declaration
       | function_definition ;
 
 function_definition
-    ::= IDENT ':' 'function' return_type '(' [ parameter_list ] ')' '=' compound_stmt ;
+    ::= IDENT ':' 'function' return_type '(' [ parameter_list ] ')' '=' compound_stmt
+      | IDENT ':' 'function' return_type '(' [ parameter_list ] ')' ';' ;
 
 parameter_list
     ::= parameter { ',' parameter } ;
@@ -196,7 +197,8 @@ primary_expr
       | CHAR_LITERAL
       | STRING_LITERAL
       | BOOL_LITERAL
-      | '(' expr ')' ;
+      | '(' expr ')'
+      | array_initializer ;
 
 BOOL_LITERAL
     ::= 'true'

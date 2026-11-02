@@ -1,7 +1,7 @@
 # Formal Lexical Specification for the B-Minor Compiler Front-End
 
 **Course:** Principles of Compiler Design (Fall 2026 / 1405)  
-**Author:** Undergraduate Student Specification  
+**Author:** Shayan Ghanbarnasab  
 **Component:** Lexical Analyzer (Scanner)  
 **Target Language:** B-Minor  
 
