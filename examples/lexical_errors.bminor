@@ -1,0 +1,24 @@
+// =============================================================================
+// Lexical Error Resilience Demonstration
+// Contains invalid characters (@, $) and unterminated string literal
+// =============================================================================
+
+// Valid declarations
+counter: integer = 100;
+status: boolean = true;
+
+// Intentional Lexical Error 1: Invalid character '@'
+@
+offset: integer = 25;
+
+// Intentional Lexical Error 2: Invalid character '$'
+price: integer = $ 99;
+
+// Intentional Lexical Error 3: Unterminated string literal
+badString: string = "This string is never terminated;
+
+// Subsequent valid function demonstrating lexer recovery
+testRecovery: function void () = {
+    recoveredMessage: string = "Lexer recovered successfully!\n";
+    print recoveredMessage, "Current count = ", counter, "\n";
+}

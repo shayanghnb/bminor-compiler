@@ -1,0 +1,51 @@
+// =============================================================================
+// Comprehensive B-Minor Example: Factorial, Loops, and Arrays
+// Demonstrates functions, recursion, for-loops, while-loops, arrays, and types
+// =============================================================================
+
+// Global configuration and constants
+banner: string = "=== B-Minor Factorial & Iteration Demo ===\n";
+prefix: string = "Calculated factorial: ";
+limit: integer = 5;
+isActive: boolean = true;
+statusChar: char = 'K';
+
+// Array initialization
+numbers: array [5] integer = { 1, 2, 3, 4, 5 };
+
+// Recursive factorial function
+factorial: function integer ( n: integer ) = {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1); // Recursive call
+    }
+}
+
+// Function demonstrating loops and array manipulation
+printTable: function void ( count: integer ) = {
+    i: integer = 0;
+    print banner;
+    
+    // For loop iterating through array elements
+    for (i = 0; i < count; i++) {
+        val: integer = numbers[i];
+        res: integer = factorial(val);
+        print prefix, val, "! = ", res, "\n";
+    }
+    
+    // While loop counting down
+    countdown: integer = 3;
+    while (countdown > 0) {
+        print "Countdown step: ", countdown, "\n";
+        countdown--;
+    }
+}
+
+// Main entry point
+main: function void () = {
+    if (isActive) {
+        printTable(limit);
+        print "Status check: ", statusChar, " - Execution completed successfully.\n";
+    }
+}

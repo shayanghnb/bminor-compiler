@@ -1,0 +1,33 @@
+// =============================================================================
+// Syntax Error Recovery Demonstration
+// Demonstrates Panic-Mode synchronization on missing expression & missing ')'
+// =============================================================================
+
+// First function containing intentional syntax errors
+brokenFunction: function void () = {
+    // Intentional Error 1: Missing expression after '=' (Course Spec Page 13)
+    x: integer = ;
+    
+    // Parser synchronizes to ';' and successfully parses subsequent valid declaration
+    y: integer = 42;
+    
+    // Intentional Error 2: Missing ')' in if-condition before block (Course Spec Page 13)
+    if (y > 0 {
+        print "Recovered inside if branch! Value of y is: ", y, "\n";
+    }
+    
+    return;
+}
+
+// Subsequent valid function successfully parsed despite prior errors
+validFunction: function integer ( base: integer, multiplier: integer ) = {
+    result: integer = base * multiplier;
+    print "validFunction parsed and executed cleanly. Result = ", result, "\n";
+    return result;
+}
+
+// Main function invoking the recovered valid function
+main: function void () = {
+    res: integer = validFunction(6, 7);
+    print "Main completed with answer: ", res, "\n";
+}
