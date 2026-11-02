@@ -4,5 +4,21 @@
 *.obj
 bin/
 build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile.cmake
+bminor
+test_lexer
+test_ast
+test_parser
+test_highlighter
+
+# Generated output and HTML artifacts
+sample_output.html
+examples/*.html
+*.html
+
+# IDE configurations
 .vscode/
 .idea/
